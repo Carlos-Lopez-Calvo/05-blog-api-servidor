@@ -1,24 +1,36 @@
-# Documentación del Proyecto: API RESTful para Blog con CodeIgniter 4
+# Documentación del Proyecto: API RESTful para Restaurante con CodeIgniter 4
 
 ## Índice
 1. [Introducción](#introducción)
 2. [Stack Tecnológico](#stack-tecnológico)
 3. [Proceso de Desarrollo](#proceso-de-desarrollo)
-4. [Endpoints de la API](#endpoints-de-la-api)
-5. [Pruebas](#pruebas)
-6. [Reflexión Final](#reflexión-final)
+4. [Modelado de Recursos del Restaurante](#modelado-de-recursos-del-restaurante)
+5. [Endpoints de la API](#endpoints-de-la-api)
+6. [Pruebas](#pruebas)
+7. [Reflexión Final](#reflexión-final)
 
 ---
 
 ## Introducción
 
-Este proyecto consiste en la creación de una **API RESTful** para gestionar posts de un blog. El objetivo principal es aprender los fundamentos de **CodeIgniter 4**, el manejo de bases de datos con **SQLite** y los principios de las APIs REST.
+Este proyecto consiste en la creación de una **API RESTful** para gestionar la operativa básica de un restaurante.  
+El objetivo principal es aprender los fundamentos de **CodeIgniter 4**, el manejo de bases de datos con **SQLite** y los principios de las APIs REST, aplicados a un dominio real de negocio.
+
+La API permite gestionar cuatro recursos principales:
+- **Dishes (Platos)**: Elementos del menú del restaurante.
+- **Tables (Mesas)**: Mesas físicas del local.
+- **Reservations (Reservas)**: Reservas de clientes para una fecha y hora.
+- **Orders (Pedidos)**: Pedidos realizados por los clientes (asociados a una mesa y/o reserva).
 
 ### Objetivos del Proyecto
-- ✅ Construir endpoints CRUD (Create, Read, Update, Delete) para posts
-- ✅ Implementar validación de datos
+- ✅ Construir endpoints CRUD (Create, Read, Update, Delete) para:
+  - Platos (`dishes`)
+  - Mesas (`tables`)
+  - Reservas (`reservations`)
+  - Pedidos (`orders`)
+- ✅ Implementar validación de datos en el servidor
 - ✅ Manejar respuestas HTTP apropiadas
-- ✅ Implementar funcionalidad de búsqueda
+- ✅ Implementar funcionalidad de búsqueda para platos
 - ✅ Documentar todo el proceso de desarrollo
 
 ---
@@ -34,7 +46,7 @@ Este proyecto consiste en la creación de una **API RESTful** para gestionar pos
 
 **CodeIgniter 4**: Es un framework PHP moderno, ligero y con excelente documentación. Perfecto para aprender los conceptos de MVC y desarrollo de APIs.
 
-**SQLite**: Es una base de datos que se almacena en un solo archivo, no requiere un servidor de BD separado, lo que la hace ideal para desarrollo y proyectos pequeños.
+**SQLite**: Es una base de datos que se almacena en un solo archivo, no requiere un servidor de BD separado, lo que la hace ideal para desarrollo y proyectos pequeños como la gestión de un restaurante.
 
 ---
 
@@ -95,7 +107,7 @@ CI_ENVIRONMENT = development
 app.baseURL = 'http://localhost:8080/'
 
 database.default.hostname = localhost
-database.default.database = /ruta/absoluta/writable/database/blog.db
+database.default.database = /ruta/absoluta/writable/database/restaurant.db
 database.default.DBDriver = SQLite3
 ```
 
@@ -107,7 +119,7 @@ database.default.DBDriver = SQLite3
 
 ---
 
-### Paso 2: Crear la Estructura de la Tabla (Migraciones)
+### Paso 2: Crear la Estructura de la Base de Datos (Migraciones)
 
 #### ¿Qué es una Migración?
 Una **migración** es un archivo PHP que describe cambios en la estructura de la base de datos. Es como un "control de versiones" para tu BD.
@@ -118,43 +130,73 @@ Una **migración** es un archivo PHP que describe cambios en la estructura de la
 - 👥 Compartir estructura con el equipo
 - 🚀 Desplegar cambios en producción de forma controlada
 
-#### Crear la migración
+#### Crear las migraciones
+
+Generamos una migración para cada recurso principal:
 ```bash
-php spark make:migration CreatePostsTable
+php spark make:migration CreateDishesTable
+php spark make:migration CreateTablesTable
+php spark make:migration CreateReservationsTable
+php spark make:migration CreateOrdersTable
 ```
 
-#### Métodos up() y down()
+#### Diseño básico de tablas
 
-**`up()`**: Define QUÉ hacer (crear tabla, agregar columnas, etc.)
-**`down()`**: Define CÓMO revertirlo (eliminar tabla, quitar columnas, etc.)
+- **Tabla `dishes`** (platos):
+  - `id`: INT, autoincremental, clave primaria
+  - `name`: VARCHAR(255)
+  - `description`: TEXT
+  - `price`: DECIMAL(10,2)
+  - `category`: VARCHAR(100)
+  - `is_available`: TINYINT(1) (1 = disponible, 0 = no disponible)
+  - `created_at`: DATETIME
+  - `updated_at`: DATETIME
 
-#### Código de la migración
+- **Tabla `tables`** (mesas):
+  - `id`: INT, autoincremental, clave primaria
+  - `name`: VARCHAR(50) (ej: "Mesa 1", "Terraza A")
+  - `capacity`: INT (número de personas)
+  - `is_active`: TINYINT(1) (mesa utilizable o fuera de servicio)
+  - `created_at`: DATETIME
+  - `updated_at`: DATETIME
 
-Ver archivo: `app/Database/Migrations/2025-11-05-122918_CreatePostsTable.php`
+- **Tabla `reservations`** (reservas):
+  - `id`: INT, autoincremental, clave primaria
+  - `customer_name`: VARCHAR(255)
+  - `customer_phone`: VARCHAR(50)
+  - `table_id`: INT (FK a `tables`)
+  - `reservation_datetime`: DATETIME
+  - `people_count`: INT
+  - `status`: VARCHAR(50) (ej: "pending", "confirmed", "cancelled")
+  - `created_at`: DATETIME
+  - `updated_at`: DATETIME
 
-La tabla incluye:
-- `id`: INT, autoincremental, clave primaria
-- `title`: VARCHAR(255)
-- `content`: TEXT
-- `category`: VARCHAR(100)
-- `tags`: TEXT (almacenamos JSON)
-- `created_at`: DATETIME
-- `updated_at`: DATETIME
+- **Tabla `orders`** (pedidos):
+  - `id`: INT, autoincremental, clave primaria
+  - `table_id`: INT (FK a `tables`, opcional si es delivery)
+  - `reservation_id`: INT (FK a `reservations`, opcional)
+  - `items`: TEXT (almacenamos JSON con los platos del pedido)
+  - `total_amount`: DECIMAL(10,2)
+  - `status`: VARCHAR(50) (ej: "pending", "in_progress", "served", "paid", "cancelled")
+  - `created_at`: DATETIME
+  - `updated_at`: DATETIME
 
-#### Ejecutar la migración
+#### Ejecutar las migraciones
 ```bash
 php spark migrate
 ```
 
 ---
 
-### Paso 3: Crear el Modelo
+## Modelado de Recursos del Restaurante
+
+### Paso 3: Crear los Modelos
 
 #### ¿Qué es un Modelo en MVC?
 El **Modelo** es la capa que interactúa con la base de datos. Su responsabilidad es:
 - 📊 Consultar datos
 - ✏️ Insertar/actualizar/eliminar registros
-- ✅ Validar datos
+- ✅ Validar datos (junto con las reglas de validación de CI4)
 - 🔄 Transformar datos
 
 **Patrón MVC:**
@@ -162,9 +204,14 @@ El **Modelo** es la capa que interactúa con la base de datos. Su responsabilida
 - **View**: Presenta datos al usuario (en APIs, JSON)
 - **Controller**: Coordina Model y View
 
-#### Crear el modelo
+#### Crear los modelos
+
+Para cada recurso creamos un modelo:
 ```bash
-php spark make:model Post --suffix
+php spark make:model Dish --suffix
+php spark make:model Table --suffix
+php spark make:model Reservation --suffix
+php spark make:model Order --suffix
 ```
 
 #### Propiedades importantes del modelo
@@ -178,18 +225,16 @@ php spark make:model Post --suffix
 ```php
 // Sin $allowedFields protegido
 $model->insert($request->getJSON(true));
-// Un atacacker podría enviar: {"title": "Hola", "is_admin": true}
+// Un atacante podría enviar: {"name": "Mesa VIP", "is_admin": true}
 ```
 
 **`$useTimestamps = true`**: 
 - CI4 automáticamente actualiza `created_at` y `updated_at`
-- ¡No necesitas hacerlo manualmente!
-
-Ver archivo: `app/Models/PostModel.php`
+- No hace falta gestionarlos manualmente
 
 ---
 
-### Paso 4: Crear el Controlador
+### Paso 4: Crear los Controladores RESTful
 
 #### ¿Qué es un Controlador?
 El **Controlador** es el intermediario entre el usuario (peticiones HTTP) y el modelo (datos). Su trabajo es:
@@ -198,14 +243,17 @@ El **Controlador** es el intermediario entre el usuario (peticiones HTTP) y el m
 - 🔄 Llamar al modelo
 - 📤 Devolver respuestas
 
-#### Crear el controlador
+#### Crear los controladores
 ```bash
-php spark make:controller Posts --restful
+php spark make:controller Dishes --restful
+php spark make:controller Tables --restful
+php spark make:controller Reservations --restful
+php spark make:controller Orders --restful
 ```
 
 #### Controller vs ResourceController
 
-**`Controller`**: Controlador básico de CI4
+**`Controller`**: Controlador básico de CI4  
 **`ResourceController`**: Controlador especializado para APIs REST
 
 **Ventajas de ResourceController:**
@@ -214,10 +262,8 @@ php spark make:controller Posts --restful
 - ✅ Métodos predefinidos: `index()`, `show()`, `create()`, `update()`, `delete()`
 - ✅ Propiedad `$format` para especificar formato de respuesta
 
-**`$modelName`**: Especifica qué modelo usar. Accesible como `$this->model`
+**`$modelName`**: Especifica qué modelo usar. Accesible como `$this->model`  
 **`$format = 'json'`**: Define el formato de respuesta
-
-Ver archivo: `app/Controllers/Posts.php`
 
 ---
 
@@ -229,124 +275,198 @@ Archivo: `app/Config/Routes.php`
 
 ```php
 // API Routes
-$routes->get('posts/search', 'Posts::search');
-$routes->resource('posts');
+$routes->get('dishes/search', 'Dishes::search');
+
+$routes->resource('dishes');
+$routes->resource('tables');
+$routes->resource('reservations');
+$routes->resource('orders');
 ```
 
-#### ¿Qué hace `$routes->resource('posts')`?
+#### ¿Qué hace `$routes->resource('dishes')`?
 
-Esta **línea mágica** crea automáticamente todas las rutas RESTful:
+Esta línea crea automáticamente todas las rutas RESTful:
 
-| Método HTTP | URL | Controlador::Método | Acción |
-|-------------|-----|---------------------|--------|
-| GET | /posts | Posts::index() | Listar todos |
-| GET | /posts/1 | Posts::show(1) | Ver uno |
-| POST | /posts | Posts::create() | Crear nuevo |
-| PUT/PATCH | /posts/1 | Posts::update(1) | Actualizar |
-| DELETE | /posts/1 | Posts::delete(1) | Eliminar |
+| Método HTTP | URL           | Controlador::Método  | Acción              |
+|------------|---------------|----------------------|---------------------|
+| GET        | /dishes       | Dishes::index()      | Listar todos        |
+| GET        | /dishes/1     | Dishes::show(1)      | Ver uno             |
+| POST       | /dishes       | Dishes::create()     | Crear nuevo         |
+| PUT/PATCH  | /dishes/1     | Dishes::update(1)    | Actualizar          |
+| DELETE     | /dishes/1     | Dishes::delete(1)    | Eliminar            |
 
-**¿Por qué `posts/search` va antes?**
-Las rutas se evalúan en orden. Si `resource('posts')` va primero, `posts/search` sería interpretado como `posts/{id}` con `id='search'`.
+Lo mismo aplica para `tables`, `reservations` y `orders`.
+
+**¿Por qué `dishes/search` va antes?**  
+Las rutas se evalúan en orden. Si `resource('dishes')` va primero, `dishes/search` sería interpretado como `dishes/{id}` con `id='search'`.
 
 ---
 
-### Paso 6: Implementar la Lógica del Controlador
+### Paso 6: Implementar la Lógica de los Controladores
 
-#### index() - GET /posts
-```php
-return $this->respond($this->model->findAll());
-```
-**`findAll()`**: Obtiene todos los registros.
-**`respond()`**: Devuelve JSON con código 200.
+A continuación se resumen los comportamientos típicos de los métodos más importantes.
 
-#### show($id) - GET /posts/{id}
-```php
-$post = $this->model->find($id);
-if ($post === null) {
-    return $this->failNotFound('Post no encontrado');
-}
-return $this->respond($post);
-```
-Verifica que el post existe antes de devolverlo.
+#### DishesController
 
-#### create() - POST /posts
-- Obtiene datos JSON
-- Valida con reglas
-- Convierte tags a JSON si es array
-- Inserta en BD
-- Devuelve código 201
+- **index() - GET /dishes**
+  ```php
+  return $this->respond($this->model->findAll());
+  ```
+  Devuelve todos los platos.
 
-#### update($id) - PUT /posts/{id}
-- Valida datos (reglas menos estrictas)
-- Verifica que el post existe
-- Actualiza
-- Devuelve post actualizado
+- **show($id) - GET /dishes/{id}**
+  ```php
+  $dish = $this->model->find($id);
+  if ($dish === null) {
+      return $this->failNotFound('Plato no encontrado');
+  }
+  return $this->respond($dish);
+  ```
 
-#### delete($id) - DELETE /posts/{id}
-- Verifica que el post existe
-- Elimina
-- Devuelve confirmación
+- **create() - POST /dishes**
+  - Obtiene datos JSON
+  - Valida con reglas (nombre, precio, categoría, etc.)
+  - Inserta en BD
+  - Devuelve código 201 con el plato creado
 
-#### search() - GET /posts/search?term={palabra}
-```php
-$posts = $this->model
-    ->like('title', $term)
-    ->orLike('content', $term)
-    ->orLike('category', $term)
-    ->findAll();
-```
-**`like()` y `orLike()`**: Búsqueda con LIKE SQL.
+- **update($id) - PUT /dishes/{id}**
+  - Valida datos (reglas menos estrictas)
+  - Verifica que el plato existe
+  - Actualiza
+  - Devuelve el plato actualizado
+
+- **delete($id) - DELETE /dishes/{id}**
+  - Verifica que el plato existe
+  - Elimina (o marca como no disponible)
+  - Devuelve confirmación
+
+- **search() - GET /dishes/search?term={palabra}**
+  ```php
+  $dishes = $this->model
+      ->like('name', $term)
+      ->orLike('description', $term)
+      ->orLike('category', $term)
+      ->findAll();
+  ```
+
+#### TablesController
+
+- Gestiona las mesas del restaurante:
+  - `index()`: listar mesas
+  - `show($id)`: ver una mesa
+  - `create()`: crear mesa (nombre, capacidad)
+  - `update($id)`: actualizar datos
+  - `delete($id)`: desactivar/eliminar mesa
+
+#### ReservationsController
+
+- Gestiona reservas de clientes:
+  - `index()`: listar reservas
+  - `show($id)`: ver una reserva
+  - `create()`: crear reserva (cliente, fecha/hora, mesa, número de personas)
+  - `update($id)`: actualizar (por ejemplo, cambiar estado a "confirmed" o "cancelled")
+  - `delete($id)`: cancelar/eliminar reserva
+
+#### OrdersController
+
+- Gestiona pedidos:
+  - `index()`: listar pedidos
+  - `show($id)`: ver un pedido
+  - `create()`: crear pedido (mesa, reserva, items, total)
+  - `update($id)`: actualizar estado (ej: "in_progress", "served", "paid")
+  - `delete($id)`: cancelar pedido
 
 ---
 
 ### Paso 7: Validar los Datos
 
 #### ¿Por qué validar en el servidor?
-**¡NUNCA confíes en el cliente!**
+**Nunca confíes en el cliente.**
 
 Razones:
 - 🔒 **Seguridad**: El cliente puede ser manipulado
 - 🛡️ **Integridad**: Garantizar datos correctos en la BD
 - 🚫 **Prevención**: Evitar inyecciones SQL, XSS, etc.
 
-#### Reglas de validación
+#### Reglas de validación (ejemplos)
 
-**En create():**
+**En `Dishes::create()`:**
 ```php
 $rules = [
-    'title' => 'required|min_length[5]',
-    'content' => 'required|min_length[10]',
-    'category' => 'required'
+    'name'        => 'required|min_length[3]',
+    'description' => 'required|min_length[10]',
+    'price'       => 'required|decimal',
+    'category'    => 'required',
 ];
 ```
 
-**En update():**
+**En `Reservations::create()`:**
 ```php
 $rules = [
-    'title' => 'permit_empty|min_length[5]',
-    'content' => 'permit_empty|min_length[10]',
-    'category' => 'permit_empty'
+    'customer_name'       => 'required|min_length[3]',
+    'customer_phone'      => 'required',
+    'table_id'            => 'required|integer',
+    'reservation_datetime'=> 'required|valid_date',
+    'people_count'        => 'required|integer',
 ];
 ```
 
-**Diferencia:**
-- `required`: El campo DEBE estar presente
-- `permit_empty`: El campo es opcional, pero si está presente debe cumplir las reglas
+**En `Orders::create()`:**
+```php
+$rules = [
+    'items'        => 'required',
+    'total_amount' => 'required|decimal',
+];
+```
 
 ---
 
 ## Endpoints de la API
 
-### Resumen de Endpoints
+### Resumen de Endpoints Principales
 
-| Método | Endpoint | Descripción | Código Éxito | Código Error |
-|--------|----------|-------------|--------------|--------------|
-| GET | /posts | Listar todos los posts | 200 | - |
-| GET | /posts/{id} | Obtener un post | 200 | 404 |
-| POST | /posts | Crear un post | 201 | 400 |
-| PUT | /posts/{id} | Actualizar un post | 200 | 400, 404 |
-| DELETE | /posts/{id} | Eliminar un post | 200 | 404 |
-| GET | /posts/search?term={palabra} | Buscar posts | 200 | 400 |
+#### Dishes (Platos)
+
+| Método | Endpoint                         | Descripción                  | Código Éxito | Código Error        |
+|--------|----------------------------------|------------------------------|--------------|---------------------|
+| GET    | /dishes                          | Listar todos los platos      | 200          | -                   |
+| GET    | /dishes/{id}                     | Obtener un plato             | 200          | 404                 |
+| POST   | /dishes                          | Crear un plato               | 201          | 400                 |
+| PUT    | /dishes/{id}                     | Actualizar un plato          | 200          | 400, 404            |
+| DELETE | /dishes/{id}                     | Eliminar/ocultar un plato    | 200          | 404                 |
+| GET    | /dishes/search?term={palabra}    | Buscar platos                | 200          | 400                 |
+
+#### Tables (Mesas)
+
+| Método | Endpoint     | Descripción               | Código Éxito | Código Error |
+|--------|--------------|---------------------------|--------------|--------------|
+| GET    | /tables      | Listar mesas              | 200          | -            |
+| GET    | /tables/{id} | Obtener una mesa          | 200          | 404          |
+| POST   | /tables      | Crear una mesa            | 201          | 400          |
+| PUT    | /tables/{id} | Actualizar una mesa       | 200          | 400, 404     |
+| DELETE | /tables/{id} | Eliminar/desactivar mesa  | 200          | 404          |
+
+#### Reservations (Reservas)
+
+| Método | Endpoint            | Descripción                | Código Éxito | Código Error |
+|--------|---------------------|----------------------------|--------------|--------------|
+| GET    | /reservations       | Listar reservas            | 200          | -            |
+| GET    | /reservations/{id}  | Obtener una reserva        | 200          | 404          |
+| POST   | /reservations       | Crear una reserva          | 201          | 400          |
+| PUT    | /reservations/{id}  | Actualizar una reserva     | 200          | 400, 404     |
+| DELETE | /reservations/{id}  | Cancelar/eliminar reserva  | 200          | 404          |
+
+#### Orders (Pedidos)
+
+| Método | Endpoint     | Descripción                 | Código Éxito | Código Error |
+|--------|--------------|-----------------------------|--------------|--------------|
+| GET    | /orders      | Listar pedidos              | 200          | -            |
+| GET    | /orders/{id} | Obtener un pedido           | 200          | 404          |
+| POST   | /orders      | Crear un pedido             | 201          | 400          |
+| PUT    | /orders/{id} | Actualizar un pedido        | 200          | 400, 404     |
+| DELETE | /orders/{id} | Cancelar un pedido          | 200          | 404          |
+
+---
 
 ### Códigos de Estado HTTP
 
@@ -369,46 +489,68 @@ $rules = [
 
 ### Ejemplos de Pruebas
 
-#### 1. Crear Post (POST /posts)
+#### 1. Crear Plato (POST /dishes)
 ```json
 {
-  "title": "Mi Primer Post en CI4",
-  "content": "Este es el contenido de mi primer post.",
-  "category": "Desarrollo",
-  "tags": ["php", "codeigniter", "api"]
+  "name": "Pizza Margarita",
+  "description": "Pizza clásica con tomate, mozzarella y albahaca fresca.",
+  "price": 9.99,
+  "category": "Pizzas",
+  "is_available": true
 }
 ```
 
-#### 2. Listar Posts (GET /posts)
-Devuelve array con todos los posts.
+#### 2. Listar Platos (GET /dishes)
+Devuelve un array con todos los platos del menú.
 
-#### 3. Obtener Post (GET /posts/1)
-Devuelve un post específico.
-
-#### 4. Actualizar Post (PUT /posts/1)
+#### 3. Crear Mesa (POST /tables)
 ```json
 {
-  "title": "Título Actualizado"
+  "name": "Mesa Terraza 1",
+  "capacity": 4,
+  "is_active": true
 }
 ```
 
-#### 5. Buscar (GET /posts/search?term=ci4)
-Busca en title, content y category.
+#### 4. Crear Reserva (POST /reservations)
+```json
+{
+  "customer_name": "Juan Pérez",
+  "customer_phone": "+34 600 000 000",
+  "table_id": 1,
+  "reservation_datetime": "2025-11-26 21:00:00",
+  "people_count": 4
+}
+```
 
-#### 6. Eliminar (DELETE /posts/1)
-Elimina el post.
+#### 5. Crear Pedido (POST /orders)
+```json
+{
+  "table_id": 1,
+  "reservation_id": 1,
+  "items": [
+    { "dish_id": 1, "quantity": 2 },
+    { "dish_id": 3, "quantity": 1 }
+  ],
+  "total_amount": 29.97,
+  "status": "pending"
+}
+```
+
+#### 6. Buscar Platos (GET /dishes/search?term=pizza)
+Busca en `name`, `description` y `category`.
 
 ---
 
 ## Reflexión Final
 
 ### ¿Qué fue lo más fácil?
-La **configuración inicial** y la **creación de rutas con `resource()`**. CodeIgniter 4 tiene excelentes herramientas CLI que generan código automáticamente.
+La **configuración inicial** del proyecto y la **creación de rutas con `resource()`**. CodeIgniter 4 proporciona herramientas CLI que agilizan enormemente la creación de APIs REST.
 
 ### ¿Qué fue lo más difícil?
-1. **Configurar SQLite correctamente** con rutas absolutas
-2. **Entender ResourceController** vs Controller
-3. **Manejo de tags como JSON** en SQLite
+1. **Diseñar el modelo de datos** para cubrir platos, mesas, reservas y pedidos sin complicar demasiado el esquema.
+2. **Gestionar relaciones** entre tablas (por ejemplo, pedidos asociados a reservas y mesas).
+3. **Definir estados** claros para reservas y pedidos (pending, confirmed, cancelled, served, paid…).
 
 ### ¿Qué aprendí?
 
@@ -416,32 +558,34 @@ La **configuración inicial** y la **creación de rutas con `resource()`**. Code
 - ✅ Framework bien estructurado con separación clara de responsabilidades
 - ✅ Sistema de migraciones poderoso
 - ✅ Modelos con características de seguridad integradas
-- ✅ Spark es increíblemente útil
-- ✅ Documentación excelente
+- ✅ Spark es muy útil para generar código y ejecutar tareas
 
-**Sobre APIs REST:**
-- ✅ Importancia de códigos de estado HTTP correctos
-- ✅ Estructura de URLs RESTful
-- ✅ Validación del servidor es CRÍTICA
-- ✅ Respuestas consistentes facilitan consumo
+**Sobre APIs REST aplicadas a un restaurante:**
+- ✅ Importancia de diseñar bien los recursos (dishes, tables, reservations, orders)
+- ✅ Códigos de estado HTTP correctos facilitan la integración con otros sistemas
+- ✅ URLs RESTful claras hacen la API predecible
+- ✅ Validación en el servidor es crítica para mantener integridad de la información
 
 **Conceptos clave:**
 1. **Patrón MVC**: Separación clara de responsabilidades
 2. **Mass Assignment Protection**: `$allowedFields` es crucial
-3. **Migraciones**: Control de versiones para BD
+3. **Migraciones**: Control de versiones para la base de datos
 4. **RESTful Design**: APIs predecibles y fáciles de usar
 5. **Validación**: Nunca confiar en el cliente
 
 ### Próximos pasos
-- 🔐 Autenticación con JWT
-- 📄 Paginación
-- 🔍 Filtros avanzados
-- 📝 Documentación con Swagger
-- ✅ Tests automatizados
-- 🚀 Rate limiting
+- 🔐 Autenticación con JWT para empleados o camareros
+- 📄 Paginación de listados (platos, reservas, pedidos)
+- 🔍 Filtros avanzados (por fecha, estado, rango de precio)
+- 📝 Documentación interactiva con Swagger / OpenAPI
+- ✅ Tests automatizados (unitarios y de integración)
+- 🚀 Rate limiting para proteger la API en producción
 
 ---
 
 ## Conclusión
 
-Este proyecto fue una excelente introducción a CodeIgniter 4 y al desarrollo de APIs RESTful. La combinación de CI4 con SQLite resultó perfecta para aprendizaje y desarrollo rápido.
+Este proyecto fue una excelente introducción a CodeIgniter 4 y al desarrollo de APIs RESTful aplicadas a un caso real como la gestión de un restaurante.  
+La combinación de CI4 con SQLite resultó perfecta para aprendizaje y desarrollo rápido de una solución completa que cubre platos, mesas, reservas y pedidos.
+
+

@@ -7,6 +7,10 @@ use CodeIgniter\Router\RouteCollection;
  */
 $routes->get('/', 'Home::index');
 
-// API Routes
-$routes->get('posts/search', 'Posts::search');
-$routes->resource('posts');
+// API Routes Restaurante
+$routes->get('dishes/search', 'Dishes::search');
+
+$routes->resource('dishes');
+$routes->resource('tables');
+$routes->resource('reservations');
+$routes->resource('orders');
