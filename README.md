@@ -5,7 +5,7 @@
 ## 🎯 Descripción del Proyecto
 
 Este proyecto es una **API RESTful** construida con **CodeIgniter 4** y **SQLite** que implementa operaciones CRUD completas para gestionar posts de un blog. Incluye validación de datos, búsqueda, manejo de errores y documentación exhaustiva.
-
+ 
 ### ✨ Características
 
 - ✅ CRUD completo (Create, Read, Update, Delete)
